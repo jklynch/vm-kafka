@@ -1,0 +1,17 @@
+---
+- name: Set Up Kafka for bluesky
+  hosts: all
+  become: yes
+  become_method: sudo
+  vars_files:
+    - kafka-vars.yml
+
+  tasks:
+    - name: Add user kafka
+      user:
+        name: kafka
+        password: "$6$OwF7w5Fh8$0OkwC1ENRW.vUGTpSU9ajQH0RmqidhghYESkqvnQYPl7X38KOX8aLK48Ky08Pghp0uzXmP6MNGtNKWWS9If0q."
+        groups:
+          - "wheel"
+
+
