@@ -1,0 +1,88 @@
+Vagrant.configure("2") do |config|
+  config.vm.provision "shell", inline: "echo Hello"
+
+  config.vm.define "kafka0" do |kafka0|
+    kafka0.vm.box = "bento/centos-8"
+    kafka0.vm.network "private_network", ip: "192.168.64.30"
+    kafka0.vm.hostname = "kafka0"
+    kafka0.vm.provision "shell", inline: <<-SHELL
+      sudo echo "192.168.64.31 kafka1" | sudo tee -a /etc/hosts
+      sudo echo "192.168.64.32 kafka2" | sudo tee -a /etc/hosts
+    SHELL
+    kafka0.vm.provision "ansible" do |ansible|
+      ansible.playbook = "zookeeper-playbook.yml"
+      ansible.extra_vars = {}
+    end
+    kafka0.vm.provision "ansible" do |ansible|
+      ansible.playbook = "../kafka-playbook.yml"
+      ansible.extra_vars = {
+        broker_id: "100",
+        zookeeper_connect: "192.168.64.30:2181,192.168.64.31:2181,192.168.64.32:2181"
+      }
+    end
+  end
+
+  config.vm.define "kafka1" do |kafka1|
+    kafka1.vm.box = "bento/centos-8"
+    kafka1.vm.network "private_network", ip: "192.168.64.31"
+    kafka1.vm.hostname = "kafka1"
+    kafka1.vm.provision "shell", inline: <<-SHELL
+      sudo echo "192.168.64.30 kafka0" | sudo tee -a /etc/hosts
+      sudo echo "192.168.64.32 kafka2" | sudo tee -a /etc/hosts
+    SHELL
+    kafka1.vm.provision "ansible" do |ansible|
+      ansible.playbook = "zookeeper-playbook.yml"
+      ansible.extra_vars = {}
+    end
+    kafka1.vm.provision "ansible" do |ansible|
+      ansible.playbook = "../kafka-playbook.yml"
+      ansible.extra_vars = {
+        broker_id: "101",
+        zookeeper_connect: "192.168.64.30:2181,192.168.64.31:2181,192.168.64.32:2181"
+      }
+    end
+  end
+
+  config.vm.define "kafka2" do |kafka2|
+    kafka2.vm.box = "bento/centos-8"
+    kafka2.vm.network "private_network", ip: "192.168.64.32"
+    kafka2.vm.hostname = "kafka2"
+    kafka2.vm.provision "shell", inline: <<-SHELL
+      sudo echo "192.168.64.30 kafka0" | sudo tee -a /etc/hosts
+      sudo echo "192.168.64.31 kafka1" | sudo tee -a /etc/hosts
+    SHELL
+    kafka2.vm.provision "ansible" do |ansible|
+      ansible.playbook = "zookeeper-playbook.yml"
+      ansible.extra_vars = {}
+    end
+    kafka2.vm.provision "ansible" do |ansible|
+      ansible.playbook = "../kafka-playbook.yml"
+      ansible.extra_vars = {
+        broker_id: "102",
+        zookeeper_connect: "192.168.64.30:2181,192.168.64.31:2181,192.168.64.32:2181"
+      }
+    end
+  end
+
+  config.vm.define "bluesky" do |bluesky|
+    bluesky.vm.box = "bento/centos-8"
+    bluesky.vm.network "private_network", ip: "192.168.83.0"
+    bluesky.vm.hostname = "bluesky"
+    bluesky.vm.synced_folder "../plan", "/plan"
+    bluesky.vm.provision "shell", inline: <<-SHELL
+      sudo echo "192.168.64.30 kafka0" | sudo tee -a /etc/hosts
+      sudo echo "192.168.64.31 kafka1" | sudo tee -a /etc/hosts
+      sudo echo "192.168.64.32 kafka2" | sudo tee -a /etc/hosts
+    SHELL
+    bluesky.vm.provision "ansible" do |ansible|
+      ansible.playbook = "../bluesky-playbook.yml"
+      ansible.extra_vars = {
+        zookeeper: "192.168.64.30:2181",
+        bluesky_topic: "bluesky-kafka-test",
+        bluesky_topic_replication_factor: 3,
+        bluesky_topic_partitions: 3
+      }
+    end
+  end
+
+end

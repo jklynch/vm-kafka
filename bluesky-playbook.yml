@@ -1,0 +1,69 @@
+---
+- name: Install bluesky
+  hosts: all
+  become: yes
+  become_method: sudo
+  vars_files:
+    - bluesky-vars.yml
+
+  tasks:
+    - name: Update!
+      yum:
+        name: '*'
+        state: latest
+
+    - name: Install git
+      yum:
+        name: git
+        state: latest
+
+    - name: Install Python 3
+      yum:
+        name: python3
+        state: latest
+
+    - name: Create a virtual environment for bluesky
+      become: no
+      shell: python3 -m venv bluesky
+
+    - name: Upgrade pip
+      become: no
+      shell: bluesky/bin/pip install --upgrade pip
+
+    - name: Clone bluesky-kafka repository
+      become: no
+      shell: git clone https://github.com/jklynch/bluesky-kafka.git
+
+    - name: Install bluesky-kafka
+      become: no
+      shell: bluesky/bin/pip install -e bluesky-kafka/
+
+    - name: Install JRE
+      yum:
+        name: java-openjdk
+        state: latest
+
+    - name: Create a directory for Kafka
+      file:
+        path: /home/vagrant/kafka
+        state: directory
+      become: yes
+      become_user: vagrant
+
+    - name: Download Kafka
+      get_url:
+        url: http://mirror.cc.columbia.edu/pub/software/apache/kafka/2.3.1/kafka_2.12-2.3.1.tgz
+        dest: /home/vagrant
+      become: yes
+      become_user: vagrant
+
+    - name: Unpack Kafka
+      shell: cd /home/vagrant/kafka && tar -xvzf /home/vagrant/kafka_2.12-2.3.1.tgz --strip 1
+      become: yes
+      become_user: vagrant
+
+    - name: Create the "bluesky" topic
+      shell: ~/kafka/bin/kafka-topics.sh --create --zookeeper {{ zookeeper }} --replication-factor {{ bluesky_topic_replication_factor }} --partitions {{ bluesky_topic_partitions }} --topic {{ bluesky_topic }}
+      ignore_errors: yes
+      become: yes
+      become_user: vagrant

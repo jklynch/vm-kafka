@@ -1,0 +1,68 @@
+---
+- name: Install ZooKeeper
+  hosts: all
+  become: yes
+  become_method: sudo
+  vars_files:
+    - zookeeper-vars.yml
+
+  tasks:
+    - name: Update!
+      yum:
+        name: '*'
+        state: latest
+
+    - name: Install JRE
+      yum:
+        name: java-openjdk
+        state: latest
+
+    - name: Add user zookeeper
+      user:
+        name: zookeeper
+        groups:
+          - "wheel"
+
+    - name: Create a directory for ZooKeeper
+      file:
+        path: /home/zookeeper/kafka
+        state: directory
+      become: yes
+      become_user: zookeeper
+
+    - name: Download Kafka
+      get_url:
+        url: http://mirror.cc.columbia.edu/pub/software/apache/kafka/2.3.1/kafka_2.12-2.3.1.tgz
+        dest: /home/zookeeper
+      become: yes
+      become_user: zookeeper
+
+    - name: Unpack Kafka
+      shell: cd /home/zookeeper/kafka && tar -xvzf /home/zookeeper/kafka_2.12-2.3.1.tgz --strip 1
+      become: yes
+      become_user: zookeeper
+
+    # - name: Configure ZooKeeper - set zookeeper address(es)
+    #   lineinfile:
+    #     path: /home/zookeeper/kafka/config/server.properties
+    #     regexp: '^zookeeper.connect='
+    #     line: zookeeper.connect={{ zookeeper_connect }}
+    #   become: yes
+    #   become_user: zookeeper
+
+    - name: Copy zookeeper.service
+      copy:
+        src: files/zookeeper.service
+        dest: /etc/systemd/system/zookeeper.service
+
+    - name: Start ZooKeeper
+      shell: systemctl start zookeeper
+
+    - name: Start ZooKeeper on reboot
+      shell: systemctl enable zookeeper
+
+    - name: Remove zookeeper account from sudo group
+      shell: gpasswd -d zookeeper wheel
+
+    - name: lock zookeeper account password
+      shell: passwd zookeeper -l
