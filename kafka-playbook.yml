@@ -1,5 +1,5 @@
 ---
-- name: Set Up Kafka for bluesky
+- name: Install Kafka
   hosts: all
   become: yes
   become_method: sudo
@@ -7,6 +7,16 @@
     - kafka-vars.yml
 
   tasks:
+    - name: Update!
+      yum:
+        name: '*'
+        state: latest
+
+    - name: Install JRE
+      yum:
+        name: java-openjdk
+        state: latest
+
     - name: Add user kafka
       user:
         name: kafka
@@ -14,4 +24,60 @@
         groups:
           - "wheel"
 
+    - name: Create a directory for Kafka
+      file:
+        path: /home/kafka/kafka
+        state: directory
+      become: yes
+      become_user: kafka
 
+    - name: Download Kafka
+      get_url:
+        url: http://mirror.cc.columbia.edu/pub/software/apache/kafka/2.3.1/kafka_2.12-2.3.1.tgz
+        dest: /home/kafka
+      become: yes
+      become_user: kafka
+
+    - name: Unpack Kafka
+      shell: cd /home/kafka/kafka && tar -xvzf /home/kafka/kafka_2.12-2.3.1.tgz --strip 1
+      become: yes
+      become_user: kafka
+
+    - name: Configure Kafka - set zookeeper address(es)
+      lineinfile:
+        path: /home/kafka/kafka/config/server.properties
+        regexp: '^zookeeper.connect='
+        line: zookeeper.connect={{ zookeeper_connect }}
+      become: yes
+      become_user: kafka
+
+    - name: Configure Kafka - enable topic deletion
+      blockinfile:
+        path: /home/kafka/kafka/config/server.properties
+        insertafter: EOF
+        block: |
+          delete.topic.enable = true
+      become: yes
+      become_user: kafka
+
+    # - name: Copy zookeeper.service
+    #   copy:
+    #     src: files/zookeeper.service
+    #     dest: /etc/systemd/system/zookeeper.service
+    #
+    - name: Copy kafka.service
+      copy:
+        src: files/kafka.service
+        dest: /etc/systemd/system/kafka.service
+
+    - name: Start Kafka
+      shell: systemctl start kafka
+
+    - name: Start Kafka on reboot
+      shell: systemctl enable kafka
+
+    - name: Remove kafka account from sudo group
+      shell: gpasswd -d kafka wheel
+
+    - name: lock kafka account password
+      shell: passwd kafka -l
